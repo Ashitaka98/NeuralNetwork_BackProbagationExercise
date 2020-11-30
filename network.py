@@ -1,5 +1,9 @@
 import numpy as np
-import matplotlib as plt
+import tkinter
+import matplotlib
+matplotlib.use('TKAgg')
+import matplotlib.pyplot as plt
+
 
 def sigmoid(z):
     """The sigmoid function."""
@@ -20,12 +24,13 @@ def ReLU_prime(z):
 
 class Network(object):
 
-    def __init__(self, sizes, activation_function):
+    def __init__(self, sizes, activation_mode):
         self.num_layers = len(sizes)
         self.sizes = sizes
         self.biases = [np.random.randn(y,1) for y in sizes[1:]]
         self.weights = [np.random.randn(y,x) for x,y in zip(sizes[:-1], sizes[1:])]
-        self.activation_function = activation_function
+        self.activation_function = sigmoid if activation_mode=='sigmoid' else ReLU
+        self.activation_derivative = sigmoid_prime if activation_mode=='sigmoid' else ReLU_prime
     
     def feedforward(self, a):
         """ Return the output of the network if "a" is input."""
@@ -42,10 +47,10 @@ class Network(object):
         after each epoch, and partial progress printed out. This is useful for tracking progress,
         but slows things down substantially.
         """
-        if test_data: n_test = len(test_data)
-        n = len(training_data)
         for j in range(epochs):
-            np.random.shuffle(training_data)
+            step = eta/(1+j//100)
+            self.update_mini_batch(training_data,step)
+            print("Epoch {} Loss: {:.5f}".format(j,self.compute_cost(training_data)))
 
     def update_mini_batch(self, mini_batch, eta):
         """
@@ -85,10 +90,66 @@ class Network(object):
             activations.append(activation)
         
         # backward pass
-        delta = self.cost_derivative(activation[-1], y)
-
+        delta = self.cost_derivative(activations[-1], y) * self.activation_derivative(zs[-1])
+        nabla_b[-1] = delta
+        nabla_w[-1] = np.dot(delta, activations[-2].transpose())
+        for l in range(2, self.num_layers):
+            delta = np.dot(self.weights[-l+1].transpose(),delta)*self.activation_derivative(zs[-l])
+            nabla_b[-l] = delta
+            nabla_w[-l] = np.dot(delta, activations[-l-1].transpose())
         return (nabla_b, nabla_w)
 
+    def compute_cost(self, training_data):
+        n = len(training_data)
+        total = 0
+        for x,y in training_data:
+            predict = self.feedforward(x)
+            total += np.dot(y-predict,y-predict)/2
+        return (total/n)[0][0]  
+
     def cost_derivative(self, output_activations, y):
-        """Return the vector of partial derivatives \partial C_x / \partial a for the output activations."""
+        """Return the vector of partial derivatives "partial C_x" / "partial a" for the output activations."""
         return output_activations-y
+
+def generate_training_set(size):
+    """
+    y = sin(x_1) - cos(x_2), x_1, x_2 belongs to interval [-5, 5]
+    """
+    training_set = []
+    for i in range(size):
+        x_1 = 10*np.random.uniform(0,1)-5
+        x_2 = 10*np.random.uniform(0,1)-5
+        y = np.math.sin(x_1) - np.math.cos(x_2)
+        x = np.array([x_1,x_2]).reshape(2,1)
+        example = tuple([x,y])
+        training_set.append(example)
+    return training_set
+
+def visualization(network):
+    x1 = np.linspace(-5,5,50)
+    x2 = np.linspace(-5,5,50)
+    points=[]
+    for i in x1:
+        for j in x2:
+            y = np.math.sin(i) - np.math.cos(j)
+            x = np.array([i,j]).reshape(2,1)
+            predict = network.feedforward(x)
+            points.append(np.array([i,j,y,float(predict)]))
+    points = np.array(points)
+    X = points[:,0]
+    Y = points[:,1]
+    Z = points[:,2]
+
+    fig = plt.figure()
+    axis = fig.gca(projection='3d')
+    # axis.set_xlabel('X1 Label')
+    # axis.set_ylabel('X2 Label')
+    # axis.set_zlabel('Y Label')
+    axis.scatter(X,Y,Z,c='r')
+    plt.show()
+
+if __name__ == "__main__":
+    net = Network([2,6,1],'sigmoid')
+    training_set = generate_training_set(4000)
+    net.SGD(training_set,10,50,10)
+    visualization(net)
