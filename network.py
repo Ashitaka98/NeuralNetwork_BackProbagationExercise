@@ -1,7 +1,4 @@
 import numpy as np
-import tkinter
-import matplotlib
-matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt
 
 
@@ -13,14 +10,13 @@ def sigmoid_prime(z):
     """Derivative of the sigmoid function."""
     return sigmoid(z)*(1-sigmoid(z))
 
-
 def ReLU(z):
     """The Rectified  Linear Unit."""
-    return np.max(0,z)
+    return np.clip(z, 0, None)
 
 def ReLU_prime(z):
     """Derivaive of the ReLU function"""
-    return 1 if z>0 else 0
+    return (z>0).astype(np.int32)
 
 class Network(object):
 
@@ -66,9 +62,11 @@ class Network(object):
             nabla_b = [nb+dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
             nabla_w = [nw+dnw for nw, dnw in zip(nabla_w,delta_nabla_w)]
         self.weights = [w-(eta/len(mini_batch))*nw
-                        for w, nw in zip(self.weights, nabla_w)]
+                       for w, nw in zip(self.weights, nabla_w)]
         self.biases = [b-(eta/len(mini_batch))*nb
-                        for b, nb in zip(self.biases, nabla_b)]
+                       for b, nb in zip(self.biases, nabla_b)]
+
+        
     
     
     def backprop(self, x, y):
@@ -109,7 +107,7 @@ class Network(object):
 
     def cost_derivative(self, output_activations, y):
         """Return the vector of partial derivatives "partial C_x" / "partial a" for the output activations."""
-        return output_activations-y
+        return (output_activations-y)
 
 def generate_training_set(size):
     """
@@ -117,39 +115,42 @@ def generate_training_set(size):
     """
     training_set = []
     for i in range(size):
-        x_1 = 10*np.random.uniform(0,1)-5
-        x_2 = 10*np.random.uniform(0,1)-5
-        y = np.math.sin(x_1) - np.math.cos(x_2)
-        x = np.array([x_1,x_2]).reshape(2,1)
-        example = tuple([x,y])
-        training_set.append(example)
+        x_1 = i*10/size - 5
+        for j in range(size):
+            x_2 = j*10/size - 5
+            y = 0.25*(np.math.sin(x_1) - np.math.cos(x_2) + 2)
+            x = np.array([x_1,x_2]).reshape(2,1)
+            example = tuple([x,y])
+            training_set.append(example)
     return training_set
 
-def visualization(network):
-    x1 = np.linspace(-5,5,50)
-    x2 = np.linspace(-5,5,50)
-    points=[]
-    for i in x1:
-        for j in x2:
-            y = np.math.sin(i) - np.math.cos(j)
-            x = np.array([i,j]).reshape(2,1)
-            predict = network.feedforward(x)
-            points.append(np.array([i,j,y,float(predict)]))
+def visualization(network, training_set):
+    points = []
+    for x,y in training_set:
+        prediction = network.feedforward(x)
+        points.append([x[0],x[1],4*y-2,4*float(prediction)-2])
     points = np.array(points)
     X = points[:,0]
     Y = points[:,1]
     Z = points[:,2]
+    Z_predict = points[:,3]
 
-    fig = plt.figure()
-    axis = fig.gca(projection='3d')
-    # axis.set_xlabel('X1 Label')
-    # axis.set_ylabel('X2 Label')
-    # axis.set_zlabel('Y Label')
-    axis.scatter(X,Y,Z,c='r')
+    fig1 = plt.figure()
+    axis1 = fig1.gca(projection='3d')
+    axis1.set_xlabel('X1 Label')
+    axis1.set_ylabel('X2 Label')
+    axis1.set_zlabel('Y Label')
+    axis1.scatter(X,Y,Z,c='b')
+    fig2 = plt.figure()
+    axis2 = fig2.gca(projection='3d')
+    axis2.set_xlabel('X1 Label')
+    axis2.set_ylabel('X2 Label')
+    axis2.set_zlabel('Y Label')
+    axis2.scatter(X,Y,Z_predict,c='b')
     plt.show()
 
 if __name__ == "__main__":
-    net = Network([2,6,1],'sigmoid')
-    training_set = generate_training_set(4000)
-    net.SGD(training_set,10,50,10)
-    visualization(net)
+    net = Network([2,4,1],'sigmoid')
+    training_set = generate_training_set(100)
+    net.SGD(training_set,1000,50,10)
+    visualization(net,training_set)
