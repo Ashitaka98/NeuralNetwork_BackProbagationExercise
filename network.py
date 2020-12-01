@@ -11,12 +11,18 @@ def sigmoid_prime(z):
     return sigmoid(z)*(1-sigmoid(z))
 
 def ReLU(z):
-    """The Rectified  Linear Unit."""
+    """The Rectified Linear Unit."""
     return np.clip(z, 0, None)
 
 def ReLU_prime(z):
     """Derivaive of the ReLU function"""
     return (z>0).astype(np.int32)
+
+def LReLU(z):
+    return np.clip(z,0.1*z,None)
+
+def LReLU_prime(z):
+    return 0.1 + 0.9*(z>0).astype(np.int32)
 
 class Network(object):
 
@@ -25,8 +31,10 @@ class Network(object):
         self.sizes = sizes
         self.biases = [np.random.randn(y,1) for y in sizes[1:]]
         self.weights = [np.random.randn(y,x) for x,y in zip(sizes[:-1], sizes[1:])]
-        self.activation_function = sigmoid if activation_mode=='sigmoid' else ReLU
-        self.activation_derivative = sigmoid_prime if activation_mode=='sigmoid' else ReLU_prime
+        activation_function_dict = dict(zip(['sigmoid','ReLU','LReLU'],[sigmoid,ReLU,LReLU]))
+        activation_derivative_dict = dict(zip(['sigmoid','ReLU','LReLU'],[sigmoid_prime,ReLU_prime,LReLU_prime]))
+        self.activation_function = activation_function_dict[activation_mode]
+        self.activation_derivative = activation_derivative_dict[activation_mode]
     
     def feedforward(self, a):
         """ Return the output of the network if "a" is input."""
@@ -44,9 +52,12 @@ class Network(object):
         but slows things down substantially.
         """
         for j in range(epochs):
-            step = eta/(1+j//100)
+            step = eta/(1+j//200)
             self.update_mini_batch(training_data,step)
-            print("Epoch {} Loss: {:.5f}".format(j,self.compute_cost(training_data)))
+            if j%10==0:
+                print("Epoch {} Loss: {:.5f}".format(j,self.compute_cost(training_data)))
+                
+                
 
     def update_mini_batch(self, mini_batch, eta):
         """
@@ -118,7 +129,7 @@ def generate_training_set(size):
         x_1 = i*10/size - 5
         for j in range(size):
             x_2 = j*10/size - 5
-            y = 0.25*(np.math.sin(x_1) - np.math.cos(x_2) + 2)
+            y = (np.math.sin(x_1) - np.math.cos(x_2)+2)/8+0.25
             x = np.array([x_1,x_2]).reshape(2,1)
             example = tuple([x,y])
             training_set.append(example)
@@ -128,7 +139,7 @@ def visualization(network, training_set):
     points = []
     for x,y in training_set:
         prediction = network.feedforward(x)
-        points.append([x[0],x[1],4*y-2,4*float(prediction)-2])
+        points.append([x[0],x[1],8*(y-0.25)-2,8*(float(prediction)-0.25)-2])
     points = np.array(points)
     X = points[:,0]
     Y = points[:,1]
@@ -150,7 +161,7 @@ def visualization(network, training_set):
     plt.show()
 
 if __name__ == "__main__":
-    net = Network([2,4,1],'sigmoid')
-    training_set = generate_training_set(100)
-    net.SGD(training_set,1000,50,10)
+    net = Network([2,8,1],'sigmoid')
+    training_set = generate_training_set(40)
+    net.SGD(training_set,2000,50,20)
     visualization(net,training_set)
